@@ -1,4 +1,4 @@
-import { Restaurant, Product, RestaurantCategory, ProductCategory } from '../models/models.js'
+import { Restaurant, Product, RestaurantCategory, ProductCategory, Order } from '../models/models.js'
 
 const index = async function (req, res) {
   try {
@@ -10,7 +10,8 @@ const index = async function (req, res) {
         model: RestaurantCategory,
         as: 'restaurantCategory'
       },
-        order: [[{ model: RestaurantCategory, as: 'restaurantCategory' }, 'name', 'ASC']]
+        // SOLUCIÓN
+        order: [['status', 'ASC'], [{ model: RestaurantCategory, as: 'restaurantCategory' }, 'name', 'ASC']]
       }
     )
     res.json(restaurants)
@@ -28,7 +29,9 @@ const indexOwner = async function (req, res) {
         include: [{
           model: RestaurantCategory,
           as: 'restaurantCategory'
-        }]
+        }],
+        // SOLUCIÓN
+        order: [['status', 'ASC'], ['name', 'ASC']]
       })
     res.json(restaurants)
   } catch (err) {
@@ -95,12 +98,43 @@ const destroy = async function (req, res) {
   }
 }
 
+// SOLUCIÓN
+const cambiarEstado = async function (req, res) {
+  try {
+    const orderSinDeliveredAt = await Order.findOne({
+      where: {
+        restaurantId: req.params.restaurantId,
+        deliveredAt: null
+      }
+    })
+    let restaurant = await Restaurant.findByPk(req.params.restaurantId)
+    if (orderSinDeliveredAt) {
+      if (restaurant.status === 'online') {
+        await Restaurant.update(
+          { status: 'offline' },
+          { where: { id: req.params.restaurantId } }
+        )
+      } else if (restaurant.status === 'offline') {
+        await Restaurant.update(
+          { status: 'online' },
+          { where: { id: req.params.restaurantId } }
+        )
+      }
+      restaurant = await Restaurant.findByPk(req.params.restaurantId)
+    }
+    res.json(restaurant)
+  } catch (err) {
+    res.status(500).send(err)
+  }
+}
+
 const RestaurantController = {
   index,
   indexOwner,
   create,
   show,
   update,
-  destroy
+  destroy,
+  cambiarEstado
 }
 export default RestaurantController
